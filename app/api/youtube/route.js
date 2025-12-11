@@ -3,7 +3,7 @@ import { runWorkFlow } from "./workflow";
 
 export async function GET() {
     try {
-        const result = await runWorkFlow("basicDataGenerationStart");
+        const result = await runWorkFlow("startSubtitlesGeneration");
 
         return Response.json({
             status: "success",

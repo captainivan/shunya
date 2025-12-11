@@ -51,7 +51,7 @@ export async function POST(req) {
         const audioUpload = await imagekit.upload({
             file: audioBuffer,
             fileName: "audio.mp3",
-            fileId: "6938f6d25c7cd75eb83409a6",
+            fileId:process.env.AUDIO_FILE_ID,
             overwriteFile: true,
             useUniqueFileName: false
         });

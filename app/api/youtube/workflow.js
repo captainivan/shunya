@@ -30,7 +30,7 @@ export const runWorkFlow = async (stage) => {
             const imageUpload = await imagekit.upload({
                 file: buffer,
                 fileName: "basicData.json",
-                fileId: "6938f10e5c7cd75eb803eac5",
+                fileId:process.env.BASICDATA_FILE_ID,
                 overwriteFile: true,
                 useUniqueFileName: false
             });
