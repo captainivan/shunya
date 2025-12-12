@@ -12,97 +12,95 @@ const imagekit = new ImageKit({
     urlEndpoint: process.env.IMAGEKIT_ENDPOINT_URL
 });
 
-export const runWorkFlow = async (stage) => {
+export const runWorkFlow = async (initialStage) => {
     try {
         console.log("---- Workflow Started ----");
 
-        if (stage == "basicDataGenerationStart") {
+        let stage = initialStage;
 
-            // Generate basic data
-            const basicData = await generateVdieoBasicData();
-            console.log("Basic Data Generated:", basicData.title);
+        while (stage) {
+            console.log(`Stage: ${stage}`);
 
-            // Convert JSON → Buffer
-            const buffer = Buffer.from(JSON.stringify(basicData, null, 2), "utf8");
+            if (stage === "basicDataGenerationStart") {
+                const basicData = await generateVdieoBasicData();
+                console.log("Basic Data Generated:", basicData.title);
 
+                const buffer = Buffer.from(JSON.stringify(basicData, null, 2), "utf8");
 
-            // upload a basicData file to imagekit
-            const imageUpload = await imagekit.upload({
-                file: buffer,
-                fileName: "basicData.json",
-                fileId:process.env.BASICDATA_FILE_ID,
-                overwriteFile: true,
-                useUniqueFileName: false
-            });
+                await imagekit.upload({
+                    file: buffer,
+                    fileName: "basicData.json",
+                    fileId: process.env.BASICDATA_FILE_ID,
+                    overwriteFile: true,
+                    useUniqueFileName: false
+                });
 
-            console.log("Upload Success:");
-
-            console.log("📤 basicData.json uploaded: on imagekit");
-            return await runWorkFlow("songGenerationStart");
-        }
-
-        if (stage == "songGenerationStart") {
-            // Start generating song
-            const songGeneration = await generateSong();
-            console.log("🎵 Song generation started", songGeneration);
-
-            return {
-                success: true,
-                status: "waiting_for_song"
-            };
-        }
-
-        if (stage == "startSubtitlesGeneration") {
-            console.log("🎬 Generating subtitles…");
-
-            const subtitlesUrl = await generateSubtitles();
-
-            console.log("subtitles generate and saved to imagekit");
-            return await runWorkFlow("startBgImageGeneration");
-        }
-
-        if (stage == "startBgImageGeneration") {
-            console.log("Generating BgImage...");
-
-            const bgImage = await generateBgImage();
-
-            console.log("BgImage generated and saved to imagekit");
-            return await runWorkFlow("startThubnailGeneration");
-        }
-
-        if (stage == "startThubnailGeneration") {
-            console.log("Generating Thubnail...");
-
-            const thubnail = await generateThumbnail();
-
-            console.log("Thubnail generated and saved to imagekit");
-            return await runWorkFlow("startGithubAction");
-        }
-
-        if (stage == "startGithubAction") {
-            console.log("Starting Github Action...");
-        
-            const githubAction = await fetch("https://youtube-render.vercel.app/api/demo-trigger", {
-                method: "GET"
-            });
-        
-            if (!githubAction.ok) {
-                const errText = await githubAction.text();
-                throw new Error(`Failed to trigger GitHub Action (${githubAction.status}): ${errText}`);
+                console.log("📤 basicData.json uploaded: on imagekit");
+                stage = "songGenerationStart";
+                continue;
             }
-        
-            const githubActionRes = await githubAction.json();
-            console.log("Github Action Started:", githubActionRes);
-        
-            return { success: true, message: "Workflow complete — GitHub Action triggered." };
-        }        
 
+            if (stage === "songGenerationStart") {
+                const songGen = await generateSong();
+                console.log("🎵 Song generation started", songGen);
 
-    } catch (error) {
-        console.error("❌ Workflow Failed:", error);
-        return {
-            success: false,
-            error: error.message,
-        };
+                // STOP workflow here until callback arrives
+                return { success: true, waiting_for: "song_generation" };
+            }
+
+            if (stage === "startSubtitlesGeneration") {
+                console.log("🎬 Generating subtitles…");
+
+                await generateSubtitles();
+                console.log("subtitles generate and saved to imagekit");
+
+                stage = "startBgImageGeneration";
+                continue;
+            }
+
+            if (stage === "startBgImageGeneration") {
+                console.log("Generating BgImage...");
+
+                await generateBgImage();
+                console.log("BgImage generated and saved to imagekit");
+
+                stage = "startThubnailGeneration";
+                continue;
+            }
+
+            if (stage === "startThubnailGeneration") {
+                console.log("Generating Thubnail...");
+
+                await generateThumbnail();
+                console.log("Thubnail generated and saved to imagekit");
+
+                stage = "startGithubAction";
+                continue;
+            }
+
+            if (stage === "startGithubAction") {
+                console.log("Starting Github Action...");
+
+                const res = await fetch("https://youtube-render.vercel.app/api/demo-trigger", {
+                    method: "GET",
+                });
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`Failed to trigger GitHub Action: ${text}`);
+                }
+
+                console.log("Github Action Started:", await res.json());
+                return { success: true, message: "Workflow complete" };
+            }
+
+            // Safety stop
+            console.warn("Reached unknown stage:", stage);
+            return { success: false, error: "Unknown stage " + stage };
+        }
+
+    } catch (err) {
+        console.error("❌ Workflow Failed:", err);
+        return { success: false, error: err.message };
     }
 };
