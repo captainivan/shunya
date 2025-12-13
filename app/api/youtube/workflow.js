@@ -5,102 +5,133 @@ import { generateSubtitles } from "@/lib/generateSubtitles";
 import { generateBgImage } from "@/lib/generateBgImage";
 import { generateThumbnail } from "@/lib/generateThumbnail";
 
+/**
+ * 🔐 In-memory lock (minimum protection)
+ * NOTE: For production use Redis / DB lock
+ */
+let workflowRunning = false;
 
 const imagekit = new ImageKit({
-    publicKey: process.env.IMAGEKIT_PUBLIC_URL,
-    privateKey: process.env.IMAGEKIT_PRIVATE_URL,
-    urlEndpoint: process.env.IMAGEKIT_ENDPOINT_URL
+  publicKey: process.env.IMAGEKIT_PUBLIC_URL,
+  privateKey: process.env.IMAGEKIT_PRIVATE_URL,
+  urlEndpoint: process.env.IMAGEKIT_ENDPOINT_URL,
 });
 
 export const runWorkFlow = async (initialStage) => {
-    try {
-        console.log("---- Workflow Started ----");
+  if (workflowRunning) {
+    console.log("⚠️ Workflow already running, skipping duplicate call");
+    return;
+  }
 
-        let stage = initialStage;
+  workflowRunning = true;
 
-        while (stage) {
-            console.log(`Stage: ${stage}`);
+  try {
+    console.log("---- Workflow Started ----");
 
-            if (stage === "basicDataGenerationStart") {
-                const basicData = await generateVdieoBasicData();
-                console.log("Basic Data Generated:", basicData.title);
+    let stage = initialStage;
 
-                const buffer = Buffer.from(JSON.stringify(basicData, null, 2), "utf8");
+    while (stage) {
+      console.log(`Stage: ${stage}`);
 
-                await imagekit.upload({
-                    file: buffer,
-                    fileName: "basicData.json",
-                    fileId: process.env.BASICDATA_FILE_ID,
-                    overwriteFile: true,
-                    useUniqueFileName: false
-                });
+      // ==============================
+      // BASIC DATA GENERATION
+      // ==============================
+      if (stage === "basicDataGenerationStart") {
+        const basicData = await generateVdieoBasicData();
+        console.log("✅ Basic Data Generated:", basicData.title);
 
-                console.log("📤 basicData.json uploaded: on imagekit");
-                stage = "songGenerationStart";
-                continue;
-            }
+        const buffer = Buffer.from(
+          JSON.stringify(basicData, null, 2),
+          "utf8"
+        );
 
-            if (stage === "songGenerationStart") {
-                const songGen = await generateSong();
-                console.log("🎵 Song generation started", songGen);
+        await imagekit.upload({
+          file: buffer,
+          fileName: "basicData.json",
+          fileId: process.env.BASICDATA_FILE_ID,
+          overwriteFile: true,
+          useUniqueFileName: false,
+        });
 
-                // STOP workflow here until callback arrives
-                return { success: true, waiting_for: "song_generation" };
-            }
+        console.log("📤 basicData.json uploaded to ImageKit");
 
-            if (stage === "startSubtitlesGeneration") {
-                console.log("🎬 Generating subtitles…");
+        stage = "songGenerationStart";
+        continue;
+      }
 
-                await generateSubtitles();
-                console.log("subtitles generate and saved to imagekit");
+      // ==============================
+      // SONG GENERATION (STOP HERE)
+      // ==============================
+      if (stage === "songGenerationStart") {
+        console.log("🎵 Starting song generation...");
+        await generateSong();
 
-                stage = "startBgImageGeneration";
-                continue;
-            }
+        // Stop workflow until callback resumes it
+        console.log("⏸️ Waiting for song generation callback");
+        return;
+      }
 
-            if (stage === "startBgImageGeneration") {
-                console.log("Generating BgImage...");
+      // ==============================
+      // SUBTITLES
+      // ==============================
+      if (stage === "startSubtitlesGeneration") {
+        console.log("🎬 Generating subtitles...");
+        await generateSubtitles();
 
-                await generateBgImage();
-                console.log("BgImage generated and saved to imagekit");
+        stage = "startBgImageGeneration";
+        continue;
+      }
 
-                stage = "startThubnailGeneration";
-                continue;
-            }
+      // ==============================
+      // BACKGROUND IMAGE
+      // ==============================
+      if (stage === "startBgImageGeneration") {
+        console.log("🖼️ Generating background image...");
+        await generateBgImage();
 
-            if (stage === "startThubnailGeneration") {
-                console.log("Generating Thubnail...");
+        stage = "startThubnailGeneration";
+        continue;
+      }
 
-                await generateThumbnail();
-                console.log("Thubnail generated and saved to imagekit");
+      // ==============================
+      // THUMBNAIL
+      // ==============================
+      if (stage === "startThubnailGeneration") {
+        console.log("📸 Generating thumbnail...");
+        await generateThumbnail();
 
-                stage = "startGithubAction";
-                continue;
-            }
+        stage = "startGithubAction";
+        continue;
+      }
 
-            if (stage === "startGithubAction") {
-                console.log("Starting Github Action...");
+      // ==============================
+      // GITHUB ACTION
+      // ==============================
+      if (stage === "startGithubAction") {
+        console.log("🚀 Triggering GitHub Action...");
 
-                const res = await fetch("https://youtube-render.vercel.app/api/demo-trigger", {
-                    method: "GET",
-                });
+        const res = await fetch(
+          "https://youtube-render.vercel.app/api/demo-trigger",
+          { method: "GET" }
+        );
 
-                if (!res.ok) {
-                    const text = await res.text();
-                    throw new Error(`Failed to trigger GitHub Action: ${text}`);
-                }
-
-                console.log("Github Action Started:", await res.json());
-                return { success: true, message: "Workflow complete" };
-            }
-
-            // Safety stop
-            console.warn("Reached unknown stage:", stage);
-            return { success: false, error: "Unknown stage " + stage };
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`GitHub Action failed: ${text}`);
         }
 
-    } catch (err) {
-        console.error("❌ Workflow Failed:", err);
-        return { success: false, error: err.message };
+        console.log("✅ GitHub Action triggered:", await res.json());
+        return;
+      }
+
+      console.warn("⚠️ Unknown stage:", stage);
+      return;
     }
+  } catch (err) {
+    console.error("❌ Workflow Failed:", err.message);
+  } finally {
+    // 🔓 Always release lock
+    workflowRunning = false;
+    console.log("🔓 Workflow lock released");
+  }
 };

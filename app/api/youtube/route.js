@@ -1,24 +1,24 @@
-import { NextResponse } from "next/server";
 import { runWorkFlow } from "./workflow";
 
-export async function GET() {
-    try {
-        const result = await runWorkFlow("basicDataGenerationStart");
+export async function POST() {
+  try {
+    // 🔥 Do NOT await the workflow
+    runWorkFlow("basicDataGenerationStart");
 
-        return Response.json({
-            status: "success",
-            ...result,
-        });
+    // Respond immediately to avoid retries
+    return Response.json({
+      status: "started",
+      message: "Workflow started successfully",
+    });
+  } catch (error) {
+    console.error("❌ Failed to start workflow:", error);
 
-    } catch (error) {
-        console.log(error);
-
-        return Response.json(
-            {
-                status: "error",
-                error: err.message,
-            },
-            { status: 500 }
-        );
-    }
+    return Response.json(
+      {
+        status: "error",
+        error: error.message,
+      },
+      { status: 500 }
+    );
+  }
 }
