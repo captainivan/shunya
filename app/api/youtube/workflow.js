@@ -78,8 +78,8 @@ export const runWorkFlow = async (initialStage) => {
         console.log("🎬 Generating subtitles...");
         await generateSubtitles();
 
-        // stage = "startBgImageGeneration";
-        // continue;
+        stage = "startBgImageGeneration";
+        continue;
       }
 
       // ==============================

@@ -3,7 +3,7 @@ import { runWorkFlow } from "./workflow";
 export async function POST() {
   try {
     // 🔥 Do NOT await the workflow
-    runWorkFlow("startSubtitlesGeneration");
+    runWorkFlow("basicDataGenerationStart");
 
     // Respond immediately to avoid retries
     return Response.json({
