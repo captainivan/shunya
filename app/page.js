@@ -6,7 +6,6 @@ export default function Home() {
       <iframe
         src="https://getdevcard.vercel.app/devcard/naVbLHDMIPhzW7gkllr0"
         style={{background:"transparent",overflow:"hidden"}}
-        frameBorder="0"
         allowtransparency="true"
         height="400"
         width="600"
