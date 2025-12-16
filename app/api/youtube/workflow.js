@@ -62,6 +62,7 @@ export const runWorkFlow = async (initialStage) => {
       // ==============================
       // SONG GENERATION (STOP HERE)
       // ==============================
+
       if (stage === "songGenerationStart") {
         console.log("🎵 Starting song generation...");
         await generateSong();
@@ -74,6 +75,7 @@ export const runWorkFlow = async (initialStage) => {
       // ==============================
       // SUBTITLES
       // ==============================
+
       if (stage === "startSubtitlesGeneration") {
         console.log("🎬 Generating subtitles...");
         await generateSubtitles();
@@ -85,6 +87,7 @@ export const runWorkFlow = async (initialStage) => {
       // ==============================
       // BACKGROUND IMAGE
       // ==============================
+
       if (stage === "startBgImageGeneration") {
         console.log("🖼️ Generating background image...");
         await generateBgImage();
@@ -96,6 +99,7 @@ export const runWorkFlow = async (initialStage) => {
       // ==============================
       // THUMBNAIL
       // ==============================
+
       if (stage === "startThubnailGeneration") {
         console.log("📸 Generating thumbnail...");
         await generateThumbnail();
@@ -107,6 +111,7 @@ export const runWorkFlow = async (initialStage) => {
       // ==============================
       // GITHUB ACTION
       // ==============================
+
       if (stage === "startGithubAction") {
         console.log("🚀 Triggering GitHub Action...");
 
